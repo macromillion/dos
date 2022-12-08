@@ -21,31 +21,30 @@ button2 = discord.ui.Button(label='Delete?', style=discord.ButtonStyle.danger)
 button2_off = discord.ui.Button(
     label='Deleted', style=discord.ButtonStyle.danger)
 
+
 async def get_coins(user_id, change):
     # open data file
     with open("data.json") as json_file:
         data = json.load(json_file)
-    
+
     if change != 0:
         for user in data["users"]:
             if user["id"] == user_id:
-                print(f'Changing coins to {change}...')
                 user["coins"] = user["coins"] + change
-                
+
                 # write to data file
                 with open("data.json", "w") as outfile:
                     json.dump(data, outfile)
-    
+
     # store user information
     result = False
     for user in data["users"]:
         if user["id"] == user_id:
             coins = user["coins"]
             result = True
-            
+
     # if user does not exist, create them
     if not result:
-        print('Creating user...')
         data["users"].append({
             "id": user_id,
             "coins": 0
@@ -59,27 +58,27 @@ async def get_coins(user_id, change):
             json.dump(data, outfile)
     return coins
 
+
 async def check_cooldown(user_id):
     # open data file
     with open("data.json") as json_file:
         data = json.load(json_file)
-    
+
     # store user information
     result = False
     for user in data["users"]:
         if user["id"] == user_id:
             cooldown = user["cooldown"]
             result = True
-            
+
     # if user does not exist, create them
     if not result:
-        print('Creating user...')
         data["users"].append({
             "id": user_id,
             "coins": 0,
             "cooldown": ""
         })
-        
+
         # we already know cooldown is empty, no need to read file
         cooldown = ""
 
@@ -87,12 +86,23 @@ async def check_cooldown(user_id):
         with open("data.json", "w") as outfile:
             json.dump(data, outfile)
     return cooldown
-    
+
 
 @client.event
 async def on_ready():
+    global page
     await tree.sync(guild=discord.Object(id=908146735493296169))
+    print('Creating browser...')
+    # make the page variable global
+    playwright = await async_playwright().start()
+    browser = await playwright.chromium.launch()
+    page = await browser.new_page()
+    await page.goto('https://www.roblox.com/signup')
+    await page.select_option('id=MonthDropdown', label='September')
+    await page.select_option('id=DayDropdown', label='11')
+    await page.select_option('id=YearDropdown', label='2001')
     print('Ready!')
+
 
 @tree.command(name='mine', description='Mine for coins', guild=discord.Object(id=908146735493296169))
 async def mine_command(interaction):
@@ -108,6 +118,7 @@ async def mine_command(interaction):
         title='Mine', description='You mined for coins and {}!'.format(f'found {coins} coins!' if result else 'found nothing.'), color=0xFF0000 if not result else 0x00FF00
     )
     await interaction.response.send_message(embed=embed)
+
 
 @tree.command(name='wallet', description='Check the amount of coins you have', guild=discord.Object(id=908146735493296169))
 async def wallet_command(interaction):
@@ -173,93 +184,79 @@ async def list_command(interaction):
 
 @tree.command(name='check', description='Checks if a Roblox name is valid', guild=discord.Object(id=908146735493296169))
 async def check_command(interaction, username: str):
-    async with async_playwright() as p:
-        await interaction.response.defer()
+    view = View()
+    color = 0xFF0000
 
-        view = View()
-        color = 0xFF0000
+    # checkif username is already in file
+    f = open('usernames.txt', 'r', encoding='utf-8')
+    for line in f:
+        if line.strip() == username:
+            embed = discord.Embed(
+                title='Username Check', description=f'`{username}` is already in the list.', color=color
+            )
+            view.add_item(button2)
+            await interaction.followup.send(embed=embed, view=view)
 
-        # checkif username is already in file
-        f = open('usernames.txt', 'r', encoding='utf-8')
-        for line in f:
-            if line.strip() == username:
-                embed = discord.Embed(
-                    title='Username Check', description=f'`{username}` is already in the list.', color=color
-                )
-                view.add_item(button2)
-                await interaction.followup.send(embed=embed, view=view)
+            async def button2_callback(interaction):
+                view.clear_items()
+                view.add_item(button1_off)
+                await interaction.response.edit_message(view=view)
 
-                async def button2_callback(interaction):
-                    view.clear_items()
-                    view.add_item(button1_off)
-                    await interaction.response.edit_message(view=view)
+            # define callbacks
+            button2.callback = button2_callback
+            return
+    f.close()
 
-                # define callbacks
-                button2.callback = button2_callback
-                return
+    # input username
+    await page.fill('//*[@id="signup-username"]', str(username))
+    await page.keyboard.press('Tab')
+
+    # check username
+    await asyncio.sleep(1)
+    if len(username) < 3 or len(username) > 20:
+        description = f'`{username}` is too short/long.'
+
+        view.add_item(button1_off)
+    elif await page.get_by_text('This username is already in use.', exact=True).is_visible():
+        description = f'`{username}` is already in use.'
+
+        view.add_item(button1_off)
+    elif await page.get_by_text('Username might contain private information.', exact=True).is_visible():
+        description = f'`{username}` is flagged as containing private information.'
+
+        view.add_item(button1_off)
+    elif await page.get_by_text('Username not appropriate for Roblox.', exact=True).is_visible():
+        description = f'`{username}` is not appropriate.'
+
+        view.add_item(button1_off)
+    # check if username contains any special characters
+    elif any(char in username for char in ['!', '@', '#', '$', '%', '^', '&', '*', '(', ')', '-', '+', '=', '{', '}', '[', ']', '|', '\\', ':', ';', '"', "'", '<', '>', ',', '.', '?', '/']):
+        description = f'`{username}` contains special characters.'
+
+        view.add_item(button1_off)
+    else:
+        description = f'`{username}` is available!'
+        color = 0x00FF00
+
+        view.add_item(button1)
+
+    # send the embed
+    embed = discord.Embed(
+        title='Username Check', description=description, color=color
+    )
+    await interaction.response.send_message(embed=embed, view=view)
+
+    # save button
+    async def button1_callback(interaction):
+        view.clear_items()
+        view.add_item(button1_off)
+        await interaction.response.edit_message(view=view)
+        f = open('usernames.txt', 'a')
+        f.write(f'{username}\n')
         f.close()
 
-        # setup browser
-        browser = await p.chromium.launch()
-        page = await browser.new_page()
-        await page.goto('https://www.roblox.com/signup')
+    # define callbacks
+    button1.callback = button1_callback
 
-        # set birthday
-        await page.select_option('id=MonthDropdown', label='September')
-        await page.select_option('id=DayDropdown', label='11')
-        await page.select_option('id=YearDropdown', label='2001')
-
-        # input username
-        await page.fill('//*[@id="signup-username"]', str(username))
-        await page.keyboard.press('Tab')
-
-        # check username
-        await asyncio.sleep(1)
-        if len(username) < 3 or len(username) > 20:
-            description = f'`{username}` is too short/long.'
-
-            view.add_item(button1_off)
-        elif await page.get_by_text('This username is already in use.', exact=True).is_visible():
-            description = f'`{username}` is already in use.'
-
-            view.add_item(button1_off)
-        elif await page.get_by_text('Username might contain private information.', exact=True).is_visible():
-            description = f'`{username}` is flagged as containing private information.'
-
-            view.add_item(button1_off)
-        elif await page.get_by_text('Username not appropriate for Roblox.', exact=True).is_visible():
-            description = f'`{username}` is not appropriate.'
-
-            view.add_item(button1_off)
-        elif await page.get_by_text('Usernames may only contain letters, numbers, and _.', exact=True).is_visible():
-            description = f'`{username}` contains special characters.'
-
-            view.add_item(button1_off)
-        else:
-            description = f'`{username}` is available!'
-            color = 0x00FF00
-
-            view.add_item(button1)
-
-        # send the embed
-        embed = discord.Embed(
-            title='Username Check', description=description, color=color
-        )
-        await interaction.followup.send(embed=embed, view=view)
-
-        # save button
-        async def button1_callback(interaction):
-            view.clear_items()
-            view.add_item(button1_off)
-            await interaction.response.edit_message(view=view)
-            f = open('usernames.txt', 'a')
-            f.write(f'{username}\n')
-            f.close()
-
-        # define callbacks
-        button1.callback = button1_callback
-
-        # close the browser to save ram
-        await browser.close()
 
 client.run('NjYxMDE5ODYwNDQ4NDQ0NDI2.GzV9zh.3Yhpqho_DduXVwtJjg-0LGHReLzeoA-_iKvf8A')
