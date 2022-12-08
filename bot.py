@@ -3,6 +3,7 @@ import requests
 import discord
 import time
 import asyncio
+import json
 from playwright.async_api import async_playwright
 from discord import app_commands
 from discord.ui import Button, View
@@ -17,26 +18,119 @@ button1 = discord.ui.Button(label='Save', style=discord.ButtonStyle.primary)
 button1_off = discord.ui.Button(
     label='Saved', style=discord.ButtonStyle.primary, disabled=True)
 button2 = discord.ui.Button(label='Delete?', style=discord.ButtonStyle.danger)
-button2_off = discord.ui.Button(label='Deleted', style=discord.ButtonStyle.danger)
+button2_off = discord.ui.Button(
+    label='Deleted', style=discord.ButtonStyle.danger)
 
+async def get_coins(user_id, change):
+    # open data file
+    with open("data.json") as json_file:
+        data = json.load(json_file)
+    
+    if change != 0:
+        for user in data["users"]:
+            if user["id"] == user_id:
+                print(f'Changing coins to {change}...')
+                user["coins"] = user["coins"] + change
+                
+                # write to data file
+                with open("data.json", "w") as outfile:
+                    json.dump(data, outfile)
+    
+    # store user information
+    result = False
+    for user in data["users"]:
+        if user["id"] == user_id:
+            coins = user["coins"]
+            result = True
+            
+    # if user does not exist, create them
+    if not result:
+        print('Creating user...')
+        data["users"].append({
+            "id": user_id,
+            "coins": 0
+        })
+
+        # we already know coins is 0, no need to read file
+        coins = 0
+
+        # write to data file
+        with open("data.json", "w") as outfile:
+            json.dump(data, outfile)
+    return coins
+
+async def check_cooldown(user_id):
+    # open data file
+    with open("data.json") as json_file:
+        data = json.load(json_file)
+    
+    # store user information
+    result = False
+    for user in data["users"]:
+        if user["id"] == user_id:
+            cooldown = user["cooldown"]
+            result = True
+            
+    # if user does not exist, create them
+    if not result:
+        print('Creating user...')
+        data["users"].append({
+            "id": user_id,
+            "coins": 0,
+            "cooldown": ""
+        })
+        
+        # we already know cooldown is empty, no need to read file
+        cooldown = ""
+
+        # write to data file
+        with open("data.json", "w") as outfile:
+            json.dump(data, outfile)
+    return cooldown
+    
 
 @client.event
 async def on_ready():
     await tree.sync(guild=discord.Object(id=908146735493296169))
     print('Ready!')
 
+@tree.command(name='mine', description='Mine for coins', guild=discord.Object(id=908146735493296169))
+async def mine_command(interaction):
+    # get random true or false value
+    value = random.randrange(1, 3)
+    coins = random.randrange(1, 10)
+    if value == 1:
+        result = True
+        await get_coins(interaction.user.id, coins)
+    else:
+        result = False
+    embed = discord.Embed(
+        title='Mine', description='You mined for coins and {}!'.format(f'found {coins} coins!' if result else 'found nothing.'), color=0xFF0000 if not result else 0x00FF00
+    )
+    await interaction.response.send_message(embed=embed)
+
+@tree.command(name='wallet', description='Check the amount of coins you have', guild=discord.Object(id=908146735493296169))
+async def wallet_command(interaction):
+
+    await interaction.response.send_message(f'You have {await get_coins(interaction.user.id, 0)} coins!')
+
 
 @tree.command(name='ping', description='Checks to see if the bot is online', guild=discord.Object(id=908146735493296169))
 async def ping_command(interaction, user: discord.User):
     await interaction.response.send_message(f'Pong! {user.mention}')
 
+
 @tree.command(name='flip', description='Flips a coin heads or tails', guild=discord.Object(id=908146735493296169))
 async def flip_command(interaction):
-    value = random.randrange(1,3)
+    value = random.randrange(1, 3)
     if value == 1:
-        await interaction.response.send_message(f'Heads! You\'re a faggot!')
-    else:    
-        await interaction.response.send_message(f'Tails! You\'re a bitch ass nigga!')
+        result = 'Heads!'
+    else:
+        result = 'Tails!'
+    embed = discord.Embed(
+        title='Coin Flip', description=result, color=0x00FFFF
+    )
+    await interaction.response.send_message(embed=embed)
 
 
 @tree.command(name='capometer', description='With the latest discoveries by scientists at NASA, we can now detect if a statement is truly cap', guild=discord.Object(id=908146735493296169))
@@ -81,10 +175,10 @@ async def list_command(interaction):
 async def check_command(interaction, username: str):
     async with async_playwright() as p:
         await interaction.response.defer()
-        
+
         view = View()
         color = 0xFF0000
-        
+
         # checkif username is already in file
         f = open('usernames.txt', 'r', encoding='utf-8')
         for line in f:
@@ -94,7 +188,7 @@ async def check_command(interaction, username: str):
                 )
                 view.add_item(button2)
                 await interaction.followup.send(embed=embed, view=view)
-                
+
                 async def button2_callback(interaction):
                     view.clear_items()
                     view.add_item(button1_off)
@@ -118,9 +212,6 @@ async def check_command(interaction, username: str):
         # input username
         await page.fill('//*[@id="signup-username"]', str(username))
         await page.keyboard.press('Tab')
-
-        # take screenshot
-        await page.screenshot(path='screenshot.png')
 
         # check username
         await asyncio.sleep(1)
