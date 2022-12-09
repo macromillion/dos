@@ -22,7 +22,9 @@ button2_off = discord.ui.Button(
     label='Deleted', style=discord.ButtonStyle.danger)
 fmt = '{0.minutes} minutes {0.seconds} seconds'
 
-testing = False
+FMT = '{0.minutes} minutes {0.seconds} seconds'
+TESTING = False
+
 
 async def get_coins(user_id, change):
     # load json
@@ -84,6 +86,7 @@ async def ping(ctx):
 #         get_coins(user.id, coins)
 #         await ctx.respond(f'You gifted {user.mention} {coins} coins!')
 
+
 @bot.slash_command(name='flip', description='Flips a coin heads or tails', guild=discord.Object(id=908146735493296169))
 async def flip(ctx):
     if bool(random.getrandbits(1)):
@@ -94,6 +97,7 @@ async def flip(ctx):
         title='Coin Flip', description='You flipped a coin and you got ' + result, color=0x2F3136
     )
     await ctx.respond(embed=embed)
+
 
 @bot.slash_command(name='mine', description='Mine for coins', guild=discord.Object(id=908146735493296169))
 @cooldown(1, 3600, BucketType.user)
