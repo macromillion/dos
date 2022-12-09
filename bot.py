@@ -22,7 +22,7 @@ button2_off = discord.ui.Button(
     label='Deleted', style=discord.ButtonStyle.danger)
 fmt = '{0.minutes} minutes {0.seconds} seconds'
 
-testing = True
+testing = False
 
 async def get_coins(user_id, change):
     # load json
