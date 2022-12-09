@@ -10,6 +10,8 @@ from discord.ui import Button, View
 from discord.ext.commands import cooldown, BucketType
 from dateutil.relativedelta import relativedelta as rd
 
+os.system('playwright install chromium')
+
 # declare variables
 bot = discord.Bot(intents=discord.Intents.default())
 button1 = discord.ui.Button(label='Save', style=discord.ButtonStyle.primary)
