@@ -2,3 +2,4 @@ discord
 requests
 asyncio
 playwright
+dateutil
