@@ -10,7 +10,7 @@ from discord.ui import Button, View
 from discord.ext.commands import cooldown, BucketType
 from dateutil.relativedelta import relativedelta as rd
 
-os.system('playwright install chromium;playwright install-deps')
+os.system('playwright install chromium;sudo playwright install-deps')
 
 # declare variables
 bot = discord.Bot(intents=discord.Intents.default())
