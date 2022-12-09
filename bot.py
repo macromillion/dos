@@ -20,7 +20,6 @@ button1_off = discord.ui.Button(
 button2 = discord.ui.Button(label='Delete?', style=discord.ButtonStyle.danger)
 button2_off = discord.ui.Button(
     label='Deleted', style=discord.ButtonStyle.danger)
-fmt = '{0.minutes} minutes {0.seconds} seconds'
 
 FMT = '{0.minutes} minutes {0.seconds} seconds'
 TESTING = False
@@ -62,7 +61,7 @@ async def get_coins(user_id, change):
 @bot.event
 async def on_ready():
     global page
-    if not testing:
+    if not TESTING:
         print('Creating browser...')
         playwright = await async_playwright().start()
         browser = await playwright.chromium.launch()
@@ -77,14 +76,18 @@ async def on_ready():
 async def ping(ctx):
     await ctx.respond(f'Pong!')
 
-# @bot.slash_command(name='gift', description='Gift a user coins!', guild=discord.Object(id=908146735493296169))
-# async def gift(ctx, user: discord.user, coins: int):
-#     if get_coins(ctx.user.id, 0) < coins:
-#         await ctx.respond('You dont have enough coins!')
-#     else:
-#         get_coins(ctx.user.id, -coins)
-#         get_coins(user.id, coins)
-#         await ctx.respond(f'You gifted {user.mention} {coins} coins!')
+@bot.slash_command(name='gift', description='Gift a user coins!', guild=discord.Object(id=908146735493296169))
+async def gift(ctx, user: discord.Member, coins: int):
+    if await get_coins(ctx.user.id, 0) < coins:
+        description = 'You dont have enough coins!'
+    else:
+        get_coins(ctx.user.id, -coins)
+        get_coins(user.id, coins)
+        description = f'You gifted {user.mention} {coins} coins!'
+    embed = discord.Embed(
+        title='Gift', description=description, color=0x00FFFF
+    )
+    await ctx.respond(embed=embed)
 
 
 @bot.slash_command(name='flip', description='Flips a coin heads or tails', guild=discord.Object(id=908146735493296169))
@@ -117,7 +120,7 @@ async def mine(ctx):
 async def info_error(ctx, error):
     if isinstance(error, discord.ext.commands.CommandOnCooldown):
         embed = discord.Embed(
-            title='Cooldown', description=f'Try again in **{fmt.format(rd(seconds=round(error.retry_after)))}**', color=0xFF0000
+            title='Cooldown', description=f'Try again in **{FMT.format(rd(seconds=round(error.retry_after)))}**', color=0xFF0000
         )
         await ctx.respond(embed=embed)
 
