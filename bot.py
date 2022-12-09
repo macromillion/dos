@@ -10,7 +10,7 @@ from discord.ui import Button, View
 from discord.ext.commands import cooldown, BucketType
 from dateutil.relativedelta import relativedelta as rd
 
-os.system('playwright install chromium;sudo playwright install-deps')
+os.system('playwright install chromium;playwright install-deps')
 
 # declare variables
 bot = discord.Bot(intents=discord.Intents.default())
@@ -74,6 +74,15 @@ async def on_ready():
 @bot.slash_command(name='ping', description='Checks to see if the bot is online', guild=discord.Object(id=908146735493296169))
 async def ping(ctx):
     await ctx.respond(f'Pong!')
+
+@bot.slash_command(name='gift', description='Gift a user coins!', guild=discord.Object(id=908146735493296169))
+async def gift(ctx, user: discord.user, coins: int):
+    if get_coins(ctx.user.id, 0) < coins:
+        await ctx.respond('You dont have enough coins!')
+    else:
+        get_coins(ctx.user.id, -coins)
+        get_coins(user.id, coins)
+        await ctx.respond(f'You gifted {user.mention} {coins} coins!')
 
 @bot.slash_command(name='flip', description='Flips a coin heads or tails', guild=discord.Object(id=908146735493296169))
 async def flip(ctx):
