@@ -2,4 +2,4 @@ py-cord
 requests
 asyncio
 playwright
-python-dateutit
+python-dateutil
