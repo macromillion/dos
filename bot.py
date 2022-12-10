@@ -248,4 +248,4 @@ async def check(ctx, username: str):
     button1.callback = button1_callback
 
 
-bot.run(load_dotenv('TOKEN'))
+bot.run(os.getenv('TOKEN'))
