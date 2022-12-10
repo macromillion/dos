@@ -5,6 +5,7 @@ import time
 import asyncio
 import json
 import os
+from dotenv import load_dotenv
 from playwright.async_api import async_playwright
 from discord.ui import Button, View
 from discord.ext.commands import cooldown, BucketType
@@ -81,11 +82,11 @@ async def gift(ctx, user: discord.Member, coins: int):
     if await get_coins(ctx.user.id, 0) < coins:
         description = 'You dont have enough coins!'
     else:
-        get_coins(ctx.user.id, -coins)
-        get_coins(user.id, coins)
+        await get_coins(ctx.user.id, -coins)
+        await get_coins(user.id, coins)
         description = f'You gifted {user.mention} {coins} coins!'
     embed = discord.Embed(
-        title='Gift', description=description, color=0x00FFFF
+        title='Gift', description=description, color=0xFFFF00
     )
     await ctx.respond(embed=embed)
 
@@ -151,42 +152,25 @@ async def capometer(ctx, text: str):
 
 @bot.slash_command(name='usernames', description='List the usernames that have been saved by users with the check command', guild=discord.Object(id=908146735493296169))
 async def usernames(ctx):
-    f = open('usernames.txt', 'r', encoding='utf-8')
-    usernames = ""
-    pages = []
-    count = 0
-    for line in f:
-        if count == 10:
-            count = 0
-            pages.append(usernames)
-            usernames = ""
-        count += 1
-        usernames += f'{line.strip()}\n'
-    f.close()
-
-    embed = discord.Embed(
-        title='Username List', description=usernames, color=0x00FFFF
-    )
-    embed.set_footer(text='Page 1/{}'.format(len(pages) + 1))
-    
-    async def PageView():
-        global page
-        @discord.ui.button(label="Back", style=discord.ButtonStyle.secondary, disabled=True)
-        async def back_callback(self, button, interaction):
-            global page
-            if page > 0:
-                button.disabled = False
-            page -= 1
-        
-        @discord.ui.button(label="Next", style=discord.ButtonStyle.primary)
-        async def next_callback(self, button, interaction):
-            global page
-            if page == len(pages):
-                button.disabled = True
-            page += 1
-            await interaction.response.send_message("Next!")
-
-    await ctx.respond(embed=embed, view=PageView())
+    with open("data.json") as json_file:
+        data = json.load(json_file)
+        usernames = []
+        count = 0
+        embedPage_count = 0
+        embedPage = 1
+        usernames_temp = ''
+        for entry in data['roblox_names']:
+            if count == 10:
+                embedPage_count += 1
+                count = 0
+                usernames.append(usernames_temp)
+                usernames_temp = ''
+            usernames_temp += f'{entry}\n'
+            count += 1
+        embed = discord.Embed(
+            title='Usernames', description=usernames, color=0x00FFFF
+        )
+        await ctx.respond(embed=embed)
 
 
 @bot.slash_command(name='check', description='Checks if a Roblox name is valid', guild=discord.Object(id=908146735493296169))
@@ -264,4 +248,4 @@ async def check(ctx, username: str):
     button1.callback = button1_callback
 
 
-bot.run('NjQzMjAyOTU3MTc2NzMzNzQw.Gskb1P.-4eLOU7r0DVuGS-zwEvfGT2KSz3tPBa_TGUzbI')
+bot.run(load_dotenv('TOKEN'))

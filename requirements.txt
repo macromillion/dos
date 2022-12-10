@@ -4,3 +4,4 @@ asyncio
 playwright
 python-dateutil
 requests
+python-dotenv
