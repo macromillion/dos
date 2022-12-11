@@ -147,7 +147,7 @@ async def flip(ctx, bet: int):
 @cooldown(1, 900, BucketType.user)
 async def mine(ctx):
     coins = random.randrange(1, 10)
-    if bool(random.getrandbits(1)):
+    if random.randint(1, 5) == 1:
         result = True
         await currency(ctx.user.id, coins)
     else:
