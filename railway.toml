@@ -1,9 +1,0 @@
-[build]
-builder = "nixpacks"
-buildCommand = "playwright install chromium --with-deps"
-
-[deploy]
-startCommand = "echo starting!"
-healthcheckPath = "/"
-healthcheckTimeout = 100
-restartPolicyType = "never"
