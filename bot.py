@@ -255,7 +255,7 @@ async def shop(ctx, item: str = None):
         if item.lower() == 'superpickaxe':
             if await currency(ctx.user.id, 0) >= 200:
                 await currency(ctx.user.id, -200)
-                await REDIS.hset(ctx.user.id, 'pickaxe', True)
+                REDIS.hset(ctx.user.id, 'pickaxe', True)
                 embed = discord.Embed(
                     title='Shop', description='You bought a super pickaxe! Use `/mine` to mine for coins!', color=discord.Color.green()
                 )
@@ -266,7 +266,8 @@ async def shop(ctx, item: str = None):
         else:
             embed = discord.Embed(
                 title='Shop', description='That item doesn\'t exist!', color=discord.Color.red()
-
+            )
+        await ctx.respond(embed=embed)
 
 @bot.slash_command(name='check', description='Checks if a Roblox name is valid, costs 1 coin to save', guild=discord.Object(id=908146735493296169))
 async def check(ctx, username: str):
