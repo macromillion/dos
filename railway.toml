@@ -4,6 +4,4 @@ buildCommand = "playwright install chromium; playwright install-deps; echo built
 
 [deploy]
 startCommand = "echo starting!"
-healthcheckPath = "/"
-healthcheckTimeout = 100
 restartPolicyType = "always"
