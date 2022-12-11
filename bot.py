@@ -102,8 +102,12 @@ async def roulette(ctx, bet: int, type: str):
 
 @bot.slash_command(name='gift', description='Gift a user coins!', guild=discord.Object(id=908146735493296169))
 async def gift(ctx, user: discord.Member, coins: int):
-    if await currency(ctx.user.id, 0) < coins:
-        description = 'You dont have enough coins!'
+    if coins < 0:
+        description = 'You can\'t gift negative coins!'
+    elif coins == 0:
+        description = 'You can\'t gift nothing!'
+    elif await currency(ctx.user.id, 0) < coins:
+        description = 'You don\'t have enough coins!'
     else:
         await currency(ctx.user.id, -coins)
         await currency(user.id, coins)
@@ -118,18 +122,22 @@ async def gift(ctx, user: discord.Member, coins: int):
 async def flip(ctx, bet: int):
     if await currency(ctx.user.id, 0) < bet:
         description = 'You dont have enough coins!'
+        color = 0xFF0000
     elif math.floor(int(await currency(ctx.user.id, 0))/2) < bet:
         description = 'You cant bet more than half of your coins!'
+        color = 0xFF0000
     else:
         await currency(ctx.user.id, -bet)
         if bool(random.getrandbits(1)):
             win = bet*2
             await currency(ctx.user.id, win)
             description = f'You flipped a coin and you got **heads**. You won ** {win} coins**!'
+            color = 0x00FF00
         else:
             description = f'You flipped a coin and you got **tails**. You lost ** {bet} coins**.'
+            color = 0xFF0000
     embed = discord.Embed(
-            title='Coin Flip', description=description, color=0xFFFF00
+            title='Coin Flip', description=description, color=color
     )
     embed.set_footer(text='Spend you coins wisely!', icon_url=ctx.user.avatar)
     await ctx.respond(embed=embed)
@@ -173,13 +181,13 @@ async def money(ctx, user: discord.Member, coins: int):
 
 
 @bot.slash_command(name='wallet', description='Check the amount of coins you have', guild=discord.Object(id=908146735493296169))
-async def wallet(ctx, user: discord.Member = None):
-    if user is None:
+async def wallet(ctx, member: discord.Member = None):
+    if member is None:
         coins = await currency(ctx.user.id, 0)
     else:
-        coins = await currency(user.id, 0)
+        coins = await currency(member.id, 0)
     embed = discord.Embed(
-    title='Wallet' if user is None else f'{user.name}\'s Wallet', description=f'You have {await currency(ctx.user.id, 0)} coins!' if user is None else f'{user.name} has {await currency(ctx.user.id, 0)} coins!', color=0x00FFFF
+    title='Wallet' if member is None else f'{member.name}\'s Wallet', description=f'You have {await currency(member.id, 0)} coins!' if member is None else f'{member.name} has {await currency(member.id, 0)} coins!', color=0x00FFFF
     )
     embed.set_footer(text='Get more coins by mining, gambling, or being gifted!', icon_url=ctx.user.avatar)
     await ctx.respond(embed=embed)
