@@ -33,15 +33,15 @@ REDIS = redis.Redis.from_url(
 
 async def currency(user_id, change):
     user_id = str(user_id)
-    coins = REDIS.hget('coins', user_id)
+    coins = REDIS.hget(user_id, 'coins')
     if coins == None:
         if change < 0:
             change = 0
-        REDIS.hset('coins', user_id, value=str(change))
+        REDIS.hset(user_id, 'coins', value=str(change))
     else:
-        REDIS.hset('coins', user_id,
+        REDIS.hset(user_id, 'coins',
                    value=str(int(coins)+int(change)))
-    return int(REDIS.hget('coins', user_id))
+    return int(REDIS.hget(user_id, 'coins'))
 
 @bot.event
 async def on_ready():
@@ -162,14 +162,18 @@ async def flip(ctx, bet: int):
 @bot.slash_command(name='mine', description='Mine for coins', guild=discord.Object(id=908146735493296169))
 @cooldown(1, 900, BucketType.user)
 async def mine(ctx):
-    coins = random.randrange(1, 10)
-    if random.randint(1, 5) == 1:
-        result = True
-        await currency(ctx.user.id, coins)
-    else:
-        result = False
     # check if user has an upgraded pickaxe
-    upgrade = False
+    upgrade = bool(REDIS.hget(f'{ctx.user.id}', 'superpickaxe'))
+    if upgrade:
+        coins = random.randrange(10, 30)
+        result = True
+    else:
+        coins = random.randrange(1, 10)
+        if random.randint(1, 5) == 1:
+            result = True
+            await currency(ctx.user.id, coins)
+        else:
+            result = False
     embed = discord.Embed(
         title='Mine', description='You mined with a **{}** and {}!'.format('super pickaxe' if upgrade else 'normal pickaxe', f'found **{coins} coins**!' if result else 'found nothing.'), color=discord.Color.red() if not result else discord.Color.green()
     )
@@ -208,6 +212,7 @@ async def wallet(ctx, hidden: bool = False):
         color=discord.Color.orange()
     )
     embed.add_field(name='Bank', value=f'You have **{await currency(ctx.user.id, 0)} coins**!', inline=False)
+    embed.add_field(name='Inventory', value='pickaxe - `owned`\nsuperpickaxe - `{}`\nultrapickaxe - `{}`'.format('owned' if bool(REDIS.hget(f'{ctx.user.id}', 'superpickaxe')) else 'not owned', 'owned' if bool(REDIS.hget(f'{ctx.user.id}', 'ultrapickaxe')) else 'not owned'), inline=False)
     embed.add_field(name='Ledger', value='Your recent transactions are coming soon!', inline=False)
     await ctx.respond(embed=embed, ephemeral=True if hidden else False)
 
@@ -248,21 +253,41 @@ async def shop(ctx, item: str = None):
         embed = discord.Embed(
             title='Shop', description='You can buy items to use within the bot! Use `/shop <item>` to buy an item.', color=discord.Color.green()
         )
-        embed.add_field(name='superpickaxe `[in stock]`', value='Costs `100` coins. Upgrade the **yield** for mining and **prevents mining nothing**.', inline=False)
-        embed.add_field(name='ultrapickaxe `[out of stock]', value='Costs `100` coins. Upgrade the **yield** for mining and **prevents mining nothing**.', inline=False)
+        embed.add_field(name='superpickaxe `[in stock]`', value='Costs `200` coins. Upgrade the **yield** for mining and **prevents mining nothing**.', inline=False)
+        embed.add_field(name='ultrapickaxe `[out of stock]`', value='Costs `1000` coins. Upgrade the **yield** to max.', inline=False)
         await ctx.respond(embed=embed)
     else:
         if item.lower() == 'superpickaxe':
-            if await currency(ctx.user.id, 0) >= 200:
-                await currency(ctx.user.id, -200)
-                REDIS.hset(ctx.user.id, 'pickaxe', True)
+            print(REDIS.hget(f'{ctx.user.id}', 'superpickaxe'))
+            if bool(REDIS.hget(f'{ctx.user.id}', 'superpickaxe')):
                 embed = discord.Embed(
-                    title='Shop', description='You bought a super pickaxe! Use `/mine` to mine for coins!', color=discord.Color.green()
+                    title='Shop', description='You already own this item!', color=discord.Color.red()
                 )
             else:
-                embed = discord.Embed(
-                    title='Shop', description='You don\'t have enough coins to buy this item!', color=discord.Color.red()
-                )
+                if await currency(ctx.user.id, 0) >= 200:
+                    await currency(ctx.user.id, -200)
+                    REDIS.hset(f'{ctx.user.id}', 'superpickaxe', 1)
+                    embed = discord.Embed(
+                        title='Shop', description='You bought a super pickaxe! Use `/mine` to mine for coins!', color=discord.Color.green()
+                    )
+                else:
+                    embed = discord.Embed(
+                        title='Shop', description='You don\'t have enough coins to buy this item!', color=discord.Color.red()
+                    )
+        elif item.lower() == 'ultrapickaxe':
+            embed = discord.Embed(
+                title='Shop', description='This item is out of stock!', color=discord.Color.red()
+            )
+            # if await currency(ctx.user.id, 0) >= 200:
+            #     await currency(ctx.user.id, -200)
+            #     REDIS.hset(ctx.user.id, 'ultrapickaxe', 1)
+            #     embed = discord.Embed(
+            #         title='Shop', description='You bought a super pickaxe! Use `/mine` to mine for coins!', color=discord.Color.green()
+            #     )
+            # else:
+            #     embed = discord.Embed(
+            #         title='Shop', description='You don\'t have enough coins to buy this item!', color=discord.Color.red()
+            #     )
         else:
             embed = discord.Embed(
                 title='Shop', description='That item doesn\'t exist!', color=discord.Color.red()
