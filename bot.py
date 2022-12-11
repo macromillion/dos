@@ -13,7 +13,6 @@ from discord.ext.commands import cooldown, BucketType
 from dateutil.relativedelta import relativedelta as rd
 
 load_dotenv()
-os.system('playwright install chromium')
 
 # declare variables
 bot = discord.Bot(intents=discord.Intents.default())
@@ -25,7 +24,7 @@ button2_off = discord.ui.Button(
     label='Deleted', style=discord.ButtonStyle.danger, disabled=True)
 
 FMT = '{0.minutes} minutes {0.seconds} seconds'
-TESTING = False
+TESTING = True
 REDIS = redis.Redis.from_url(
     url=str(os.getenv('REDIS_URL')),
     password=str(os.getenv('REDISPASSWORD'))
@@ -61,8 +60,21 @@ async def on_ready():
 
 @bot.slash_command(name='ping', description='Checks to see if the bot is online', guild=discord.Object(id=908146735493296169))
 async def ping(ctx):
-    await ctx.respond(f'Pong!')
+    latency = round(bot.latency * 1000)
+    embed = discord.Embed(
+        description=f'Bot latency is ``{latency}ms``', color=discord.Color.blue()
+    )
+    await ctx.respond(embed=embed)
 
+@bot.slash_command(name='avatar', description='Get a user\'s avatar', guild=discord.Object(id=908146735493296169))
+async def avatar(ctx, user: discord.Member = None):
+    if user == None:
+        user = ctx.user
+    embed = discord.Embed(
+        title=f'{user.name}\'s avatar', color=discord.Color.blue()
+    )
+    embed.set_image(url=user.avatar.with_size(1024))
+    await ctx.respond(embed=embed)
 
 @bot.slash_command(name='roulette', description='Play a game of roulette', guild=discord.Object(id=908146735493296169))
 async def roulette(ctx, bet: int, type: str):
@@ -111,10 +123,11 @@ async def gift(ctx, user: discord.Member, coins: int):
     else:
         await currency(ctx.user.id, -coins)
         await currency(user.id, coins)
-        description = f'You gifted {user.mention} {coins} coins!'
+        description = f'You gifted {user.mention} **{coins} coins**!'
     embed = discord.Embed(
-        title='Gift', description=description, color=0xFFFF00
+        title='Gift', description=description, color=discord.Color.nitro_pink()
     )
+    embed.set_footer(text=ctx.user.name, icon_url=ctx.user.avatar.with_size(128))
     await ctx.respond(embed=embed)
 
 
@@ -122,24 +135,24 @@ async def gift(ctx, user: discord.Member, coins: int):
 async def flip(ctx, bet: int):
     if await currency(ctx.user.id, 0) < bet:
         description = 'You dont have enough coins!'
-        color = 0xFF0000
+        color = discord.Color.red()
     elif math.floor(int(await currency(ctx.user.id, 0))/2) < bet:
         description = 'You cant bet more than half of your coins!'
-        color = 0xFF0000
+        color = discord.Color.red()
     else:
         await currency(ctx.user.id, -bet)
         if bool(random.getrandbits(1)):
             win = bet*2
             await currency(ctx.user.id, win)
             description = f'You flipped a coin and you got **heads**. You won ** {win} coins**!'
-            color = 0x00FF00
+            color = discord.Color.green()
         else:
             description = f'You flipped a coin and you got **tails**. You lost ** {bet} coins**.'
-            color = 0xFF0000
+            color = discord.Color.red()
     embed = discord.Embed(
             title='Coin Flip', description=description, color=color
     )
-    embed.set_footer(text='Spend you coins wisely!', icon_url=ctx.user.avatar)
+    embed.set_footer(text=ctx.user.name, icon_url=ctx.user.avatar.with_size(128))
     await ctx.respond(embed=embed)
 
 
@@ -152,10 +165,12 @@ async def mine(ctx):
         await currency(ctx.user.id, coins)
     else:
         result = False
+    # check if user has an upgraded pickaxe
+    upgrade = False
     embed = discord.Embed(
-        title='Mine', description='You mined for coins and {}!'.format(f'found {coins} coins!' if result else 'found nothing.'), color=0xFF0000 if not result else 0x00FF00
+        title='Mine', description='You mined with a **{}** and {}!'.format('super pickaxe' if upgrade else 'normal pickaxe', f'found **{coins} coins**!' if result else 'found nothing.'), color=discord.Color.red() if not result else discord.Color.green()
     )
-    embed.set_footer(text='You can mine again in 15 minutes!', icon_url=ctx.user.avatar)
+    embed.set_footer(text='You can mine again in 15 minutes!', icon_url=ctx.user.avatar.with_size(128))
     await ctx.respond(embed=embed)
 
 
@@ -163,34 +178,35 @@ async def mine(ctx):
 async def info_error(ctx, error):
     if isinstance(error, discord.ext.commands.CommandOnCooldown):
         embed = discord.Embed(
-            title='Cooldown', description=f'Try again in **{FMT.format(rd(seconds=round(error.retry_after)))}**', color=0xFF0000
+            title='Cooldown', description=f'Try again in **{FMT.format(rd(seconds=round(error.retry_after)))}**', color=discord.Color.red()
         )
         await ctx.respond(embed=embed)
 
 
 @bot.slash_command(name='money', description='Dev command for adding money', guild=discord.Object(id=908146735493296169))
 async def money(ctx, user: discord.Member, coins: int):
-    if ctx.user.id == 421129791920668672:
+    if await bot.is_owner(ctx.user):
         await currency(user.id, coins)
-        embed = discord.Embed(
-            title='Money', description=f'You gave {user.mention} {coins} coins!', color=0x00FF00
-        )
-        await ctx.respond(embed=embed)
+        if coins < 0:
+            description = f'You took **{abs(coins)} coins** from {user.mention}!'
+        else:
+            description = f'You gave {user.mention} **{coins} coins**!'
     else:
-        await ctx.respond('You are not allowed to use this command!')
+        description = 'You don\'t have permission to use this command!'
+    embed = discord.Embed(
+        description=description, color=discord.Color.green() if bot.is_owner(ctx.user) else discord.Color.red()
+    )
+    await ctx.respond(embed=embed, ephemeral=True)
 
 
 @bot.slash_command(name='wallet', description='Check the amount of coins you have', guild=discord.Object(id=908146735493296169))
-async def wallet(ctx, member: discord.Member = None):
-    if member is None:
-        coins = await currency(ctx.user.id, 0)
-    else:
-        coins = await currency(member.id, 0)
+async def wallet(ctx, hidden: bool = False):
     embed = discord.Embed(
-    title='Wallet' if member is None else f'{member.name}\'s Wallet', description=f'You have {await currency(ctx.user.id, 0)} coins!' if member is None else f'{member.name} has {await currency(member.id, 0)} coins!', color=0x00FFFF
+        color=discord.Color.orange()
     )
-    embed.set_footer(text='Get more coins by mining, gambling, or being gifted!', icon_url=ctx.user.avatar)
-    await ctx.respond(embed=embed)
+    embed.add_field(name='Bank', value=f'You have **{await currency(ctx.user.id, 0)} coins**!', inline=False)
+    embed.add_field(name='Ledger', value='Your recent transactions are coming soon!', inline=False)
+    await ctx.respond(embed=embed, ephemeral=True if hidden else False)
 
 
 @bot.slash_command(name='capometer', description='With the latest discoveries by scientists at NASA, we can now detect if a statement is truly cap', guild=discord.Object(id=908146735493296169))
@@ -198,13 +214,13 @@ async def capometer(ctx, text: str):
     cap = random.randrange(0, 100)
     if cap > 75:
         description = f'"{text}" is **cap**.'
-        color = 0xFF0000
+        color = discord.Color.red()
     elif cap > 50:
         description = f'"{text}" is **mixed**.'
-        color = 0xFFFF00
+        color = discord.Color.yellow()
     else:
         description = f'"{text}" is **hard fax**.'
-        color = 0x00FF00
+        color = discord.Color.green()
 
     embedVar = discord.Embed(
         title='Cap-O-Meter', description=description, color=color
@@ -227,13 +243,11 @@ async def usernames(ctx):
 @bot.slash_command(name='check', description='Checks if a Roblox name is valid, costs 1 coin to save', guild=discord.Object(id=908146735493296169))
 async def check(ctx, username: str):
     view = View()
-    color = 0xFF0000
-
     # check if username is already in database
     for entry in REDIS.lrange('usernames', 0, REDIS.llen('usernames')):
         if entry.decode('ascii') == username:
             embed = discord.Embed(
-                title='Username Check', description=f'`{username}` is already in the list.', color=0xFF0000
+                title='Username Check', description=f'`{username}` is already in the list.', color=discord.Color.red()
             )
             view.add_item(button2)
             await ctx.respond(embed=embed, view=view)
@@ -277,27 +291,27 @@ async def check(ctx, username: str):
 
     else:
         description = f'`{username}` is available!'
-        color = 0x00FF00
+        color = discord.Color.green()
 
         view.add_item(button1)
 
     # send the embed
     embed = discord.Embed(
-        title='Username Check', description=description, color=color
+        title='Username Check', description=description, color=discord.Color.red() if color is None else color
     )
     await page.screenshot(path='check.png')
     file = discord.File("check.png", filename="image.png")
     embed.set_image(url="attachment://image.png")
-    embed.set_footer(text='Saving usernames costs 1 coin!', icon_url=ctx.user.avatar)
+    embed.set_footer(text=ctx.user.name, icon_url=ctx.with_size(128))
     await ctx.respond(file=file, embed=embed, view=view)
 
     # save button
     async def button1_callback(ctx):
         if int(await currency(ctx.user.id, 0)) < 1:
             embed = discord.Embed(
-                    title='Username Check', description=f'`You don\'t have enough coins to save!', color=0xFF0000
+                    title='Username Check', description=f'`You don\'t have enough coins to save!', color=discord.Color.red()
             )
-            embed.set_footer(text='You can get coins by mining, gambling, and more!')
+            embed.set_footer(text=ctx.user.name)
             await ctx.respond(embed=embed)
         else:
             await currency(ctx.user.id, -1)
