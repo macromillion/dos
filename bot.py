@@ -133,7 +133,10 @@ async def gift(ctx, user: discord.Member, coins: int):
 
 @bot.slash_command(name='flip', description='Flips a coin heads or tails bet on the winning side to win!', guild=discord.Object(id=908146735493296169))
 async def flip(ctx, bet: int):
-    if await currency(ctx.user.id, 0) < bet:
+    if bet < 0:
+        description = 'You cant bet negative coins!'
+        color = discord.Color.red()
+    elif await currency(ctx.user.id, 0) < bet:
         description = 'You dont have enough coins!'
         color = discord.Color.red()
     elif math.floor(int(await currency(ctx.user.id, 0))/2) < bet:
@@ -239,9 +242,50 @@ async def usernames(ctx):
     )
     await ctx.respond(embed=embed)
 
+@bot.slash_command(name='shop', description='Buy items to use within the bot!', guild=discord.Object(id=908146735493296169))
+async def shop(ctx, item: str = None):
+    if item is None:
+        embed = discord.Embed(
+            title='Shop', description='You can buy items to use within the bot! Use `/shop <item>` to buy an item.', color=discord.Color.green()
+        )
+        embed.add_field(name='superpickaxe `[in stock]`', value='Costs `100` coins. Upgrade the **yield** for mining and **prevents mining nothing**.', inline=False)
+        embed.add_field(name='ultrapickaxe `[out of stock]', value='Costs `100` coins. Upgrade the **yield** for mining and **prevents mining nothing**.', inline=False)
+        await ctx.respond(embed=embed)
+    else:
+        if item.lower() == 'superpickaxe':
+            if await currency(ctx.user.id, 0) >= 200:
+                await currency(ctx.user.id, -200)
+                await REDIS.hset(ctx.user.id, 'pickaxe', True)
+                embed = discord.Embed(
+                    title='Shop', description='You bought a super pickaxe! Use `/mine` to mine for coins!', color=discord.Color.green()
+                )
+            else:
+                embed = discord.Embed(
+                    title='Shop', description='You don\'t have enough coins to buy this item!', color=discord.Color.red()
+                )
+        else:
+            embed = discord.Embed(
+                title='Shop', description='That item doesn\'t exist!', color=discord.Color.red()
+    if item == 'pickaxe':
+        embed = discord.Embed(
+            title='Pickaxe', description='A pickaxe that allows you to mine for more coins!', color=discord.Color.green()
+        )
+        embed.add_field(name='Price', value='**1000 coins**', inline=False)
+        embed.add_field(name='Usage', value='`/mine`', inline=False)
+        embed.set_footer(text='You can buy this item with /buy pickaxe')
+        await ctx.respond(embed=embed)
+    else:
+        embed = discord.Embed(
+            title='Shop', description='The shop is currently empty.', color=discord.Color.red()
+        )
+        await ctx.respond(embed=embed)
+
 
 @bot.slash_command(name='check', description='Checks if a Roblox name is valid, costs 1 coin to save', guild=discord.Object(id=908146735493296169))
 async def check(ctx, username: str):
+    await ctx.respond('The check command is currently disabled due to a bug. Please try again later.', ephemeral=True)
+    return
+    
     view = View()
     # check if username is already in database
     for entry in REDIS.lrange('usernames', 0, REDIS.llen('usernames')):
