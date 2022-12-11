@@ -1,6 +1,6 @@
 [build]
 builder = "nixpacks"
-buildCommand = "playwright install chromium --with-deps"
+buildCommand = "playwright install chromium; playwright install-deps; echo built!"
 
 [deploy]
 startCommand = "echo starting!"
