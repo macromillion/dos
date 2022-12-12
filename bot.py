@@ -175,7 +175,7 @@ async def mine(ctx):
             result = True
             await currency(ctx.user.id, coins)
     embed = discord.Embed(
-        title='Mine', description='You mined with a **{}** and {}!'.format('super pickaxe' if upgrade else 'normal pickaxe', f'found **{coins} coins**!' if result else 'found nothing.'), color=discord.Color.red() if not result else discord.Color.green()
+        title='Mine', description='You mined with a **{}** and {}'.format('super pickaxe' if upgrade else 'normal pickaxe', f'found **{coins} coins**!' if result else 'found nothing.'), color=discord.Color.red() if not result else discord.Color.green()
     )
     embed.set_footer(text='You can mine again in 15 minutes!', icon_url=ctx.user.avatar.with_size(128))
     await ctx.respond(embed=embed)
