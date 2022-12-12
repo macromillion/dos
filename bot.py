@@ -169,7 +169,7 @@ async def mine(ctx):
         result = True
     else:
         coins = random.randrange(1, 10)
-        if random.randint(1, 5) == 1:
+        if random.randrange(1, 5) == 1:
             result = True
             await currency(ctx.user.id, coins)
         else:
