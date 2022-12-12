@@ -170,10 +170,10 @@ async def mine(ctx):
     else:
         coins = random.randrange(1, 10)
         if random.randint(1, 5) == 1:
+            result = False
+        else:
             result = True
             await currency(ctx.user.id, coins)
-        else:
-            result = False
     embed = discord.Embed(
         title='Mine', description='You mined with a **{}** and {}!'.format('super pickaxe' if upgrade else 'normal pickaxe', f'found **{coins} coins**!' if result else 'found nothing.'), color=discord.Color.red() if not result else discord.Color.green()
     )
