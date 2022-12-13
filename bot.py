@@ -146,6 +146,7 @@ async def flip(ctx, bet: int):
         color = discord.Color.red()
     elif bet > 10:
         description = 'You can\'t bet more than 10 coins!'
+        color = discord.Color.red()
     else:
         if bool(random.getrandbits(1)):
             win = bet*2
