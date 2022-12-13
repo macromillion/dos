@@ -25,10 +25,13 @@ button2_off = discord.ui.Button(
 
 FMT = '{0.minutes} minutes {0.seconds} seconds'
 TESTING = True
+TIPS = ['Use /shop to view items', 'Use /mine to mine for coins', 'Use /flip to gamble coins for chance', 'Use /gift to gift to a friend', 'You can mine every 15 minutes',
+        'Use /wallet to check your wallet', 'You can check your ledger with /wallet', 'Upgrade your pickaxe with 200 coins', 'Check your inventory with /wallet']
 REDIS = redis.Redis.from_url(
     url=str(os.getenv('REDIS_URL')),
     password=str(os.getenv('REDISPASSWORD'))
 )
+
 
 async def currency(user_id, change, currency_type=None):
     user_id = str(user_id)
@@ -43,9 +46,11 @@ async def currency(user_id, change, currency_type=None):
         if currency_type is not None:
             if change > 0:
                 change = f'+{change}'
-            REDIS.lpush(f'{user_id}:ledger', f'**{change}** _from_ **{currency_type}**')
+            REDIS.lpush(f'{user_id}:ledger',
+                        f'**{change}** _from_ **{currency_type}**')
             REDIS.ltrim(f'{user_id}:ledger', 0, 2)
     return int(REDIS.hget(user_id, 'coins'))
+
 
 @bot.event
 async def on_ready():
@@ -70,6 +75,7 @@ async def ping(ctx):
     )
     await ctx.respond(embed=embed)
 
+
 @bot.slash_command(name='avatar', description='Get a user\'s avatar', guild=discord.Object(id=908146735493296169))
 async def avatar(ctx, user: discord.Member = None):
     if user == None:
@@ -79,6 +85,7 @@ async def avatar(ctx, user: discord.Member = None):
     )
     embed.set_image(url=user.avatar.with_size(1024))
     await ctx.respond(embed=embed)
+
 
 @bot.slash_command(name='roulette', description='Play a game of roulette', guild=discord.Object(id=908146735493296169))
 async def roulette(ctx, bet: int, type: str):
@@ -130,8 +137,10 @@ async def gift(ctx, user: discord.Member, coins: int):
     embed = discord.Embed(
         title='Gift', description=description, color=discord.Color.nitro_pink()
     )
-    embed.set_footer(text=ctx.user.name, icon_url=ctx.user.avatar.with_size(128))
+    embed.add_footer(text=random.choice(
+        TIPS), icon_url=ctx.user.avatar.with_size(128))
     await ctx.respond(embed=embed)
+
 
 @bot.slash_command(name='flip', description='Flips a coin heads or tails bet on the winning side to win!', guild=discord.Object(id=908146735493296169))
 async def flip(ctx, bet: int):
@@ -158,8 +167,10 @@ async def flip(ctx, bet: int):
             description = f'You flipped a coin and you got **tails**. You lost ** {bet} coins**.'
             color = discord.Color.red()
     embed = discord.Embed(
-            title='Coin Flip', description=description, color=color
+        title='Coin Flip', description=description, color=color
     )
+    embed.add_footer(text=random.choice(
+        TIPS), icon_url=ctx.user.avatar.with_size(128))
     await ctx.respond(embed=embed)
 
 
@@ -181,7 +192,8 @@ async def mine(ctx):
     embed = discord.Embed(
         title='Mine', description='You mined with a **{}** and {}'.format('super pickaxe' if upgrade else 'normal pickaxe', f'found **{coins} coins**!' if result else 'found nothing.'), color=discord.Color.red() if not result else discord.Color.green()
     )
-    embed.set_footer(text='You can mine again in 15 minutes!', icon_url=ctx.user.avatar.with_size(128))
+    embed.add_footer(text=random.choice(
+        TIPS), icon_url=ctx.user.avatar.with_size(128))
     await ctx.respond(embed=embed)
 
 
@@ -191,6 +203,8 @@ async def info_error(ctx, error):
         embed = discord.Embed(
             title='Cooldown', description=f'Try again in **{FMT.format(rd(seconds=round(error.retry_after)))}**', color=discord.Color.red()
         )
+        embed.add_footer(text=random.choice(
+            TIPS), icon_url=ctx.user.avatar.with_size(128))
         await ctx.respond(embed=embed)
 
 
@@ -205,7 +219,8 @@ async def money(ctx, user: discord.Member, coins: int):
     else:
         description = 'You don\'t have permission to use this command!'
     embed = discord.Embed(
-        description=description, color=discord.Color.green() if bot.is_owner(ctx.user) else discord.Color.red()
+        description=description, color=discord.Color.green(
+        ) if bot.is_owner(ctx.user) else discord.Color.red()
     )
     await ctx.respond(embed=embed, ephemeral=True)
 
@@ -216,19 +231,24 @@ async def wallet(ctx, hidden: bool = False):
         color=discord.Color.blue()
     )
     embed.add_field(name='Bank', value=f'You have **{await currency(ctx.user.id, 0)} coins**!', inline=False)
-    embed.add_field(name='Inventory', value='**pickaxe**\n{}\n{}'.format('**superpickaxe**' if bool(REDIS.hget(f'{ctx.user.id}', 'superpickaxe')) else 'superpickaxe', '**ultrapickaxe**' if bool(REDIS.hget(f'{ctx.user.id}', 'ultrapickaxe')) else 'ultrapickaxe'))
-    
+    embed.add_field(name='Inventory', value='**pickaxe**\n{}\n{}'.format('**superpickaxe**' if bool(REDIS.hget(f'{ctx.user.id}', 'superpickaxe'))
+                    else 'superpickaxe', '**ultrapickaxe**' if bool(REDIS.hget(f'{ctx.user.id}', 'ultrapickaxe')) else 'ultrapickaxe'))
+
     # generate ledger
-    ledger = REDIS.lrange(f'{ctx.user.id}:ledger', 0, REDIS.llen(f'{ctx.user.id}:ledger'))
+    ledger = REDIS.lrange(f'{ctx.user.id}:ledger', 0,
+                          REDIS.llen(f'{ctx.user.id}:ledger'))
     if ledger is None or ledger == []:
         final = 'Empty'
     else:
-        ledger = REDIS.lrange(f'{ctx.user.id}:ledger', 0, REDIS.llen(f'{ctx.user.id}:ledger'))
+        ledger = REDIS.lrange(f'{ctx.user.id}:ledger',
+                              0, REDIS.llen(f'{ctx.user.id}:ledger'))
         final = ''
         for value in ledger:
             final += f'{value.decode("ascii")}\n'
 
     embed.add_field(name='Ledger', value=final)
+    embed.add_footer(text=random.choice(
+        TIPS), icon_url=ctx.user.avatar.with_size(128))
     await ctx.respond(embed=embed, ephemeral=True if hidden else False)
 
 
@@ -248,6 +268,8 @@ async def capometer(ctx, text: str):
     embedVar = discord.Embed(
         title='Cap-O-Meter', description=description, color=color
     )
+    embed.add_footer(text=random.choice(
+        TIPS), icon_url=ctx.user.avatar.with_size(128))
     await ctx.respond(embed=embedVar)
 
 
@@ -260,7 +282,10 @@ async def usernames(ctx):
     embed = discord.Embed(
         title='Usernames', description=full, color=0x00FFFF
     )
+    embed.add_footer(text=random.choice(
+        TIPS), icon_url=ctx.user.avatar.with_size(128))
     await ctx.respond(embed=embed)
+
 
 @bot.slash_command(name='shop', description='Buy items to use within the bot!', guild=discord.Object(id=908146735493296169))
 async def shop(ctx, item: str = None):
@@ -268,8 +293,12 @@ async def shop(ctx, item: str = None):
         embed = discord.Embed(
             title='Shop', description='You can buy items to use within the bot! Use `/shop <item>` to buy an item.', color=discord.Color.green()
         )
-        embed.add_field(name='superpickaxe `200c`', value='Upgrade the **yield** for mining and **prevents mining nothing**.', inline=False)
-        embed.add_field(name='ultrapickaxe `1000c`', value='Upgrade the **yield** to max.', inline=False)
+        embed.add_field(name='superpickaxe `200c`',
+                        value='Upgrade the **yield** for mining and **prevents mining nothing**.', inline=False)
+        embed.add_field(name='ultrapickaxe `1000c`',
+                        value='Upgrade the **yield** to max.', inline=False)
+        embed.add_footer(text=random.choice(
+            TIPS), icon_url=ctx.user.avatar.with_size(128))
         await ctx.respond(embed=embed)
     else:
         if item.lower() == 'superpickaxe':
@@ -307,13 +336,16 @@ async def shop(ctx, item: str = None):
             embed = discord.Embed(
                 title='Shop', description='That item doesn\'t exist!', color=discord.Color.red()
             )
+        embed.add_footer(text=random.choice(
+            TIPS), icon_url=ctx.user.avatar.with_size(128))
         await ctx.respond(embed=embed)
+
 
 @bot.slash_command(name='check', description='Checks if a Roblox name is valid, costs 1 coin to save', guild=discord.Object(id=908146735493296169))
 async def check(ctx, username: str):
     await ctx.respond('The check command is currently disabled due to a bug. Please try again later.', ephemeral=True)
     return
-    
+
     view = View()
     # check if username is already in database
     for entry in REDIS.lrange('usernames', 0, REDIS.llen('usernames')):
@@ -322,6 +354,8 @@ async def check(ctx, username: str):
                 title='Username Check', description=f'`{username}` is already in the list.', color=discord.Color.red()
             )
             view.add_item(button2)
+            embed.add_footer(text=random.choice(
+                TIPS), icon_url=ctx.user.avatar.with_size(128))
             await ctx.respond(embed=embed, view=view)
 
             async def button2_callback(ctx):
@@ -374,16 +408,18 @@ async def check(ctx, username: str):
     await page.screenshot(path='check.png')
     file = discord.File("check.png", filename="image.png")
     embed.set_image(url="attachment://image.png")
-    embed.set_footer(text=ctx.user.name, icon_url=ctx.with_size(128))
+    embed.add_footer(text=random.choice(
+        TIPS), icon_url=ctx.user.avatar.with_size(128))
     await ctx.respond(file=file, embed=embed, view=view)
 
     # save button
     async def button1_callback(ctx):
         if int(await currency(ctx.user.id, 0)) < 1:
             embed = discord.Embed(
-                    title='Username Check', description=f'`You don\'t have enough coins to save!', color=discord.Color.red()
+                title='Username Check', description=f'`You don\'t have enough coins to save!', color=discord.Color.red()
             )
-            embed.set_footer(text=ctx.user.name)
+            embed.add_footer(text=random.choice(
+                TIPS), icon_url=ctx.user.avatar.with_size(128))
             await ctx.respond(embed=embed)
         else:
             await currency(ctx.user.id, -1, 'save')
