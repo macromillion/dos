@@ -66,7 +66,6 @@ async def on_ready():
         await page.select_option('id=YearDropdown', label='2001')
     print(f'{bot.user} is ready and online!')
 
-
 @bot.slash_command(name='ping', description='Checks to see if the bot is online', guild=discord.Object(id=908146735493296169))
 async def ping(ctx):
     latency = round(bot.latency * 1000)
@@ -189,6 +188,7 @@ async def mine(ctx):
     if upgrade:
         coins = random.randrange(10, 30)
         result = True
+        await currency(ctx.user.id, coins, 'mine')
     else:
         coins = random.randrange(1, 10)
         if random.randint(1, 5) == 1:
