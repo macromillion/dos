@@ -1,32 +1,23 @@
-import random
-import requests
-import discord
-import time
 import asyncio
-import os
-import redis
 import math
+import os
+import random
+import time
+
+import discord
+import redis
+import requests
+from dateutil.relativedelta import relativedelta as rd
+from discord.ext.commands import BucketType, cooldown
+from discord.ui import Button, View
 from dotenv import load_dotenv
 from playwright.async_api import async_playwright
-from discord.ui import Button, View
-from discord.ext.commands import cooldown, BucketType
-from dateutil.relativedelta import relativedelta as rd
 
 load_dotenv()
-
-# declare variables
 bot = discord.Bot(intents=discord.Intents.default())
-button1 = discord.ui.Button(label='Save', style=discord.ButtonStyle.primary)
-button1_off = discord.ui.Button(
-    label='Saved', style=discord.ButtonStyle.primary, disabled=True)
-button2 = discord.ui.Button(label='Delete?', style=discord.ButtonStyle.danger)
-button2_off = discord.ui.Button(
-    label='Deleted', style=discord.ButtonStyle.danger, disabled=True)
 
 FMT = '{0.minutes} minutes {0.seconds} seconds'
 TESTING = True
-TIPS = ['Use /shop to view items', 'Use /mine to mine for coins', 'Use /flip to gamble coins for chance', 'Use /gift to gift to a friend', 'You can mine every 15 minutes',
-        'Use /wallet to check your wallet', 'You can check your ledger with /wallet', 'Upgrade your pickaxe with 200 coins', 'Check your inventory with /wallet']
 REDIS = redis.Redis.from_url(
     url=str(os.getenv('REDIS_URL')),
     password=str(os.getenv('REDISPASSWORD'))
@@ -50,6 +41,19 @@ async def currency(user_id, change, currency_type=None):
                         f'**{change}** _from_ **{currency_type}**')
             REDIS.ltrim(f'{user_id}:ledger', 0, 2)
     return int(REDIS.hget(user_id, 'coins'))
+
+
+async def flips(user_id, change):
+    user_id = str(user_id)
+    famount = REDIS.hget(user_id, 'flips')
+    if famount == None:
+        if change < 0:
+            change = 0
+        REDIS.hset(user_id, 'flips', value=str(change))
+    else:
+        REDIS.hset(user_id, 'flips',
+                   value=str(int(famount)+int(change)))
+    return int(REDIS.hget(user_id, 'flips'))
 
 
 @bot.event
@@ -158,14 +162,10 @@ async def gift(ctx, user: discord.Member, coins: int, message: str = None):
 @bot.slash_command(name='flip', description='Flips a coin heads or tails bet on the winning side to win!', guild=discord.Object(id=908146735493296169))
 async def flip(ctx, bet: int):
     # get flips
-    if REDIS.hget(f'{ctx.user.id}', 'flips') is None:
-        REDIS.hset(f'{ctx.user.id}', 'flips', 0)
-        flips = 1
-    else:
-        flips = int(REDIS.hget(f'{ctx.user.id}', 'flips'))
+    famount = await flips(ctx.user.id, 0)
 
     # main function
-    if flips < 1:
+    if famount < 1:
         description = 'You don\'t have enough flips! Buy some with `/shop`.'
         color = discord.Color.red()
     elif bet < 0:
@@ -181,8 +181,8 @@ async def flip(ctx, bet: int):
         description = 'You can\'t bet nothing!'
         color = discord.Color.red()
     else:
-        REDIS.hset(f'{ctx.user.id}', 'flips', flips-1)
-        remaining = int(REDIS.hget(f'{ctx.user.id}', 'flips'))
+        await flips(ctx.user.id, -1)
+        remaining = int(await flips(ctx.user.id, 0))
         if bool(random.getrandbits(1)):
             win = bet*2
             await currency(ctx.user.id, win, 'flip')
@@ -257,42 +257,42 @@ async def wallet(ctx, hidden: bool = False):
     embed = discord.Embed(
         color=discord.Color.blue()
     )
-    embed.add_field(name='Bank', value=f'You have **{await currency(ctx.user.id, 0)} coins**!', inline=False)
-    embed.add_field(name='Inventory', value='`{}` flips\n`1` pickaxe\n{}\n{}'.format(int(REDIS.hget(f'{ctx.user.id}', 'flips')), '`1` superpickaxe' if bool(REDIS.hget(f'{ctx.user.id}', '`0` superpickaxe'))
-                    else '`0` superpickaxe', '`1` ultrapickaxe' if bool(REDIS.hget(f'{ctx.user.id}', 'ultrapickaxe')) else '`0` ultrapickaxe'))
+    famount = int(await flips(ctx.user.id, 0))
+    embed.add_field(name='Bank', value=f'You have **{await currency(ctx.user.id, 0)} coins** and **{famount} flip(s)**!', inline=False)
+    embed.add_field(name='Pickaxe', value='{}'.format('Super Pickaxe' if bool(
+        REDIS.hget(f'{ctx.user.id}', 'superpickaxe')) else 'Normal Pickaxe'))
 
     # generate ledger
-    ledger=REDIS.lrange(f'{ctx.user.id}:ledger', 0,
+    ledger = REDIS.lrange(f'{ctx.user.id}:ledger', 0,
                           REDIS.llen(f'{ctx.user.id}:ledger'))
     if ledger is None or ledger == []:
-        final='Empty'
+        final = 'Empty'
     else:
-        ledger=REDIS.lrange(f'{ctx.user.id}:ledger',
+        ledger = REDIS.lrange(f'{ctx.user.id}:ledger',
                               0, REDIS.llen(f'{ctx.user.id}:ledger'))
-        final=''
+        final = ''
         for value in ledger:
             final += f'{value.decode("ascii")}\n'
 
     embed.add_field(name='Ledger', value=final)
-    embed.set_footer(text=ctx.user.name,
-                     icon_url=ctx.user.avatar.with_size(128))
+    embed.set_thumbnail(url=ctx.user.avatar.with_size(1024))
     await ctx.respond(embed=embed, ephemeral=True if hidden else False)
 
 
 @ bot.slash_command(name='capometer', description='With the latest discoveries by scientists at NASA, we can now detect if a statement is truly cap', guild=discord.Object(id=908146735493296169))
 async def capometer(ctx, text: str):
-    cap=random.randrange(0, 100)
+    cap = random.randrange(0, 100)
     if cap > 75:
-        description=f'"{text}" is **cap**.'
-        color=discord.Color.red()
+        description = f'"{text}" is **cap**.'
+        color = discord.Color.red()
     elif cap > 50:
-        description=f'"{text}" is **mixed**.'
-        color=discord.Color.yellow()
+        description = f'"{text}" is **mixed**.'
+        color = discord.Color.yellow()
     else:
-        description=f'"{text}" is **hard fax**.'
-        color=discord.Color.green()
+        description = f'"{text}" is **hard fax**.'
+        color = discord.Color.green()
 
-    embedVar=discord.Embed(
+    embedVar = discord.Embed(
         title='Cap-O-Meter', description=description, color=color
     )
     embed.set_footer(text=ctx.user.name,
@@ -302,11 +302,11 @@ async def capometer(ctx, text: str):
 
 @ bot.slash_command(name='usernames', description='List the usernames that have been saved by users with the check command', guild=discord.Object(id=908146735493296169))
 async def usernames(ctx):
-    usernames=REDIS.lrange('usernames', 0, REDIS.llen('usernames'))
-    full=''
+    usernames = REDIS.lrange('usernames', 0, REDIS.llen('usernames'))
+    full = ''
     for user in usernames:
         full += f'{user.decode("ascii")}\n'
-    embed=discord.Embed(
+    embed = discord.Embed(
         title='Usernames', description=full, color=0x00FFFF
     )
     embed.set_footer(text=ctx.user.name,
@@ -315,14 +315,14 @@ async def usernames(ctx):
 
 
 @ bot.slash_command(name='shop', description='Buy items to use within the bot!', guild=discord.Object(id=908146735493296169))
-async def shop(ctx, item: str = None, amount: int =1):
+async def shop(ctx, item: str = None, amount: int = 1):
     if amount < 0:
-        embed=discord.Embed(
+        embed = discord.Embed(
             title='Shop', description='You can\'t buy a negative amount of an item! _Nice try_', color=discord.Color.red()
         )
         await ctx.respond(embed=embed)
     if item is None:
-        embed=discord.Embed(
+        embed = discord.Embed(
             title='Shop', description='You can buy items to use within the bot! Use `/shop <item> <amount>` to buy an item.', color=discord.Color.green()
         )
         embed.add_field(name='flips `5c`',
@@ -341,37 +341,33 @@ async def shop(ctx, item: str = None, amount: int =1):
             else:
                 print(REDIS.hget(f'{ctx.user.id}', 'superpickaxe'))
                 if bool(REDIS.hget(f'{ctx.user.id}', 'superpickaxe')):
-                    embed=discord.Embed(
+                    embed = discord.Embed(
                         title='Shop', description='You already own this item!', color=discord.Color.red()
                     )
                 else:
                     if await currency(ctx.user.id, 0) >= 200:
                         await currency(ctx.user.id, -200, 'buy pickaxe')
                         REDIS.hset(f'{ctx.user.id}', 'superpickaxe', 1)
-                        embed=discord.Embed(
+                        embed = discord.Embed(
                             title='Shop', description='You bought a **super pickaxe**!', color=discord.Color.green()
                         )
                     else:
-                        embed=discord.Embed(
+                        embed = discord.Embed(
                             title='Shop', description='You don\'t have enough coins to buy this item!', color=discord.Color.red()
                         )
         elif item.lower() == 'flips' or item.lower() == 'flip':
             if int(await currency(ctx.user.id, 0)) >= 5*amount:
                 await currency(ctx.user.id, -(5*amount), 'buy flip')
-                if REDIS.hget(ctx.user.id, 'flips') is None:
-                    REDIS.hset(ctx.user.id, 'flips', amount)
-                else:
-                    REDIS.hset(ctx.user.id, 'flips', int(
-                        REDIS.hget(ctx.user.id, 'flips')) + amount)
-                embed=discord.Embed(
+                await flips(ctx.user.id, 1)
+                embed = discord.Embed(
                     title='Shop', description=f'You bought **{amount} flip(s)**!', color=discord.Color.green()
                 )
             else:
-                embed=discord.Embed(
+                embed = discord.Embed(
                     title='Shop', description='You don\'t have enough coins to buy this item(s)!', color=discord.Color.red()
                 )
         else:
-            embed=discord.Embed(
+            embed = discord.Embed(
                 title='Shop', description='That item doesn\'t exist!', color=discord.Color.red()
             )
         embed.set_footer(text=ctx.user.name,
@@ -384,22 +380,27 @@ async def check(ctx, username: str):
     await ctx.respond('The check command is currently disabled due to a bug. Please try again later.', ephemeral=True)
     return
 
-    view=View()
+    save = discord.ui.Button(label='Save', style=discord.ButtonStyle.primary)
+    delete = discord.ui.Button(
+        label='Delete?', style=discord.ButtonStyle.danger)
+
+    view = View()
     # check if username is already in database
     for entry in REDIS.lrange('usernames', 0, REDIS.llen('usernames')):
         if entry.decode('ascii') == username:
-            embed=discord.Embed(
+            embed = discord.Embed(
                 title='Username Check', description=f'`{username}` is already in the list.', color=discord.Color.red()
             )
-            view.add_item(button2)
+            view.add_item(delete)
             embed.set_footer(text=ctx.user.name,
                              icon_url=ctx.user.avatar.with_size(128))
             await ctx.respond(embed=embed, view=view)
 
-            async def button2_callback(ctx):
+            async def delete_callback(ctx):
                 view.clear_items()
-                view.add_item(button2_off)
-                index=0
+                view.add_item(discord.ui.Button(
+                    label='Deleted', style=discord.ButtonStyle.danger, disabled=True))
+                index = 0
                 for entry in REDIS.lrange('usernames', 0, REDIS.llen('usernames')):
                     if entry.decode('ascii') == username:
                         break
@@ -408,7 +409,7 @@ async def check(ctx, username: str):
                 await ctx.response.edit_message(view=view)
 
             # define callbacks
-            button2.callback=button2_callback
+            delete.callback = delete_callback
             return
 
     # input username
@@ -418,42 +419,42 @@ async def check(ctx, username: str):
     # check username
     await asyncio.sleep(.5)
     if len(username) < 3 or len(username) > 20:
-        description=f'`{username}` is too short/long.'
+        description = f'`{username}` is too short/long.'
 
     elif await page.get_by_text('This username is already in use.', exact=True).is_visible():
-        description=f'`{username}` is already in use.'
+        description = f'`{username}` is already in use.'
 
     elif await page.get_by_text('Username might contain private information.', exact=True).is_visible():
-        description=f'`{username}` is flagged as containing private information.'
+        description = f'`{username}` is flagged as containing private information.'
 
     elif await page.get_by_text('Username not appropriate for Roblox.', exact=True).is_visible():
-        description=f'`{username}` is not appropriate.'
+        description = f'`{username}` is not appropriate.'
 
     # check if username contains any special characters
     elif any(char in username for char in ['!', '@', '#', '$', '%', '^', '&', '*', '(', ')', '-', '+', '=', '{', '}', '[', ']', '|', '\\', ':', ';', '"', "'", '<', '>', ',', '.', '?', '/', ' ']):
-        description=f'`{username}` contains special characters.'
+        description = f'`{username}` contains special characters.'
 
     else:
-        description=f'`{username}` is available!'
-        color=discord.Color.green()
+        description = f'`{username}` is available!'
+        color = discord.Color.green()
 
-        view.add_item(button1)
+        view.add_item(save)
 
     # send the embed
-    embed=discord.Embed(
+    embed = discord.Embed(
         title='Username Check', description=description, color=discord.Color.red() if color is None else color
     )
     await page.screenshot(path='check.png')
-    file=discord.File("check.png", filename="image.png")
+    file = discord.File("check.png", filename="image.png")
     embed.set_image(url="attachment://image.png")
     embed.set_footer(text=ctx.user.name,
                      icon_url=ctx.user.avatar.with_size(128))
     await ctx.respond(file=file, embed=embed, view=view)
 
     # save button
-    async def button1_callback(ctx):
+    async def save_callback(ctx):
         if int(await currency(ctx.user.id, 0)) < 1:
-            embed=discord.Embed(
+            embed = discord.Embed(
                 title='Username Check', description=f'`You don\'t have enough coins to save!', color=discord.Color.red()
             )
             embed.set_footer(text=ctx.user.name,
@@ -462,12 +463,13 @@ async def check(ctx, username: str):
         else:
             await currency(ctx.user.id, -1, 'save')
             view.clear_items()
-            view.add_item(button1_off)
+            view.add_item(discord.ui.Button(
+                label='Saved', style=discord.ButtonStyle.primary, disabled=True))
             REDIS.lpush('usernames', str(username))
             await ctx.response.edit_message(view=view)
 
     # define callbacks
-    button1.callback=button1_callback
+    save.callback = save_callback
 
 
 bot.run(str(os.getenv('TOKEN')))
