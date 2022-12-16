@@ -206,7 +206,7 @@ async def mine(ctx):
     # check if user has an upgraded pickaxe
     upgrade = bool(REDIS.hget(f'{ctx.user.id}', 'superpickaxe'))
     if upgrade:
-        coins = random.randrange(10, 30)
+        coins = random.randrange(10, 15)
         result = True
         await currency(ctx.user.id, coins, 'mine')
     else:
@@ -275,7 +275,7 @@ async def wallet(ctx, hidden: bool = False):
             final += f'{value.decode("ascii")}\n'
 
     embed.add_field(name='Ledger', value=final)
-    embed.set_thumbnail(url=ctx.user.avatar.with_size(1024))
+    embed.set_thumbnail(url=ctx.user.avatar.with_size(128))
     await ctx.respond(embed=embed, ephemeral=True if hidden else False)
 
 
