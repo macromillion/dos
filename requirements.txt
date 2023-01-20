@@ -6,3 +6,4 @@ python-dateutil
 requests
 python-dotenv
 redis
+pyleetspeak
