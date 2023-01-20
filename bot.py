@@ -11,6 +11,7 @@ from dateutil.relativedelta import relativedelta as rd
 from discord.ext.commands import BucketType, cooldown
 from discord.ui import Button, View
 from dotenv import load_dotenv
+from pyleetspeak import LeetSpeaker
 from playwright.async_api import async_playwright
 
 load_dotenv()
@@ -21,6 +22,9 @@ TESTING = True
 REDIS = redis.Redis.from_url(
     url=str(os.getenv('REDIS_URL')),
     password=str(os.getenv('REDISPASSWORD'))
+)
+LEET = LeetSpeaker(
+    change_prb=0.8, change_frq=0.6, mode="basic", seed=None, verbose=False
 )
 
 
@@ -79,6 +83,13 @@ async def ping(ctx):
     )
     await ctx.respond(embed=embed)
 
+@bot.slash_command(name='cleaner', description='Cleans usernames so that they will work in Roblox whilst still being legible', guild=discord.Object(id=908146735493296169))
+async def cleaner(ctx, username: str):
+    username = LEET.text2leet(username)
+    embed = discord.Embed (
+        title='Cleaned Username', description=f'`{username}`', color=discord.Color.purple()
+    )
+    await ctx.respond(embed)
 
 @bot.slash_command(name='avatar', description='Get a user\'s avatar', guild=discord.Object(id=908146735493296169))
 async def avatar(ctx, user: discord.Member = None):
